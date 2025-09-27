@@ -36,7 +36,7 @@ To download, hit "Code" at the top right, then download as a zip and extract it.
 
 For convenience, a pre-built .exe file is added in the repository to allow this tool to be ran without setting up a python environment.
 
-`cd C:\Users\yourusername\Downloads\encore-downloaer` (if you extract the zip in your downloads folder, replace yourusername with your Windows username. Navigate to where you extracted the tool)
+`cd C:\Users\yourusername\Downloads\encore-downloader` (if you extract the zip in your downloads folder, replace yourusername with your Windows username. Navigate to where you extracted the tool)
 
 `.\main.exe -chf C:\Users\yourusername\Documents\CloneHero-EncoreSongs` (CloneHero-EncoreSongs being a new folder, add it to Clone Hero once the download is complete)
 
