@@ -3,30 +3,37 @@ import requests, json, asyncio, uuid, aiohttp, sys, argparse, os, platform, subp
 async def downloadChart(tempFolder, chartFolder, theChart: dict) -> str:
 	url = f"https://files.enchor.us/{theChart['md5']}{('_novideo','')[not theChart['hasVideoBackground']]}.sng"
 	async with aiohttp.ClientSession() as session:
+		#changed timeout to include sock_connect and a longer total timeout
+		custom_timeout = aiohttp.ClientTimeout(sock_connect=10, total=300)
 		try:
-			resp = await session.get(url, timeout = 10)
+			resp = await session.get(url, timeout = custom_timeout)
+			if resp.status != 200:
+				print(f"Encore returned non-200 status code for chart: {resp.status}")
+				return None
+			theSng = await resp.content.read()
 		except asyncio.TimeoutError:
 			print(f"Timeout downloading chart {theChart['name']} {theChart['album']} {theChart['artist']} - {theChart['md5']}")
 			return None
-
-		if resp.status != 200:
-			print(f"Ecore returned non-200 status code for chart: {resp.status}")
-			return None
-
-		try:
-			theSng = await resp.content.read()
 		except Exception as e:
 			print(f"Error in reading sng chart content: {e}")
 			return None
 
 	sngUuid = str(uuid.uuid4())
-	sngScratchDir = f"{tempFolder}/{sngUuid}"
+	#os.path.join() to reduce the number of platform.system() calls, no idea if this is "better", but looks nicer.
+	sngScratchDir = os.path.join(tempFolder, sngUuid)
 	output = outputChartDir(chartFolder, theChart)
-	
+
 	try:
 		os.makedirs(sngScratchDir)
-		with open(f"{sngScratchDir}/{output['file']}.sng",'wb') as file:
-			file.write(theSng)
+		if platform.system() == 'Windows':
+			#Make a new directory inside scratch for SngCli.exe to output to
+			os.makedirs(f"{sngScratchDir}\\1")
+			#change .sng save to just be "chart". This could be named anything, but chart seemed appropriate.
+			with open(f"{sngScratchDir}\\chart.sng",'wb') as file:
+				file.write(theSng)
+		else:
+			with open(f"{sngScratchDir}/{output['file']}.sng",'wb') as file:
+				file.write(theSng)
 	except Exception as e:
 		print(f"Error encountered saving download - exception {e}")
 		return None
@@ -34,16 +41,36 @@ async def downloadChart(tempFolder, chartFolder, theChart: dict) -> str:
 	return sngScratchDir
 
 async def convertChart(tempFolder, chartFolder, theChart) -> bool:
-	sngCliPath = f'.\\SngCli\\SngCli.exe' if platform.system() == 'Windows' else f'SngCli/SngCli'
-
+	sngCliPath = f".\\SngCli\\SngCli.exe" if platform.system() == 'Windows' else f"SngCli/SngCli"
 	try:
-		proc = subprocess.run(f'{sngCliPath} decode -in "{tempFolder}" -out "{chartFolder}" --noStatusBar', check=True, shell=True, stdout=subprocess.DEVNULL)
+		#added variable to change destination of SngCli.exe output on Windows
+		if platform.system() == "Windows":
+			outputDir = f"{tempFolder}\\1" 
+		else:
+			outputDir = chartFolder
+		proc = subprocess.run(f'{sngCliPath} decode -in "{tempFolder}" -out "{outputDir}" --noStatusBar', check=True, shell=True, stdout=subprocess.DEVNULL)
 	except Exception as e:
 		print(f"SngCli Decode Failed: {e}")
 		return False
-
-	shutil.rmtree(f'{tempFolder}')
-
+	
+	#This block performs the making of the final directory moves the decoded charts from the scratch folder (on Windows)
+	if platform.system() == "Windows":
+		outputFolder = outputChartDir(chartFolder, theChart)
+		#Making final directory path
+		finalChartPath = f"{u'\\\\?\\'}{outputFolder['dir']}"
+		os.makedirs(finalChartPath)
+		#path of decoded chart in scratch
+		fullChartTempPath = f"{tempFolder}\\1\\chart"
+		#Moving all items inside scratch to final
+		for item in os.listdir(fullChartTempPath):
+			source_item = os.path.join(fullChartTempPath, item)
+			target_item = os.path.join(finalChartPath, item)
+			shutil.move(source_item, target_item)
+		#cleanup scratch
+		shutil.rmtree(f'{tempFolder}')
+	else:
+		shutil.rmtree(f'{tempFolder}')
+	
 	return True
 
 def getEncorePage(page: int) -> dict:
@@ -62,6 +89,7 @@ def trimPageDuplicates(thePage) -> dict:
 	return thePage
 
 def outputChartDir(chartFolder, theChart: str) -> dict:
+	MAX_FILE_LEN = os.pathconf('.', 'PC_NAME_MAX') if platform.system() != "Windows" else 255
 	newFile = f"{theChart['artist']} - {theChart['name']} ({theChart['charter']})"
 	newFile = newFile.replace("/", "")
 	newFile = newFile.replace("\\", "")
@@ -71,13 +99,19 @@ def outputChartDir(chartFolder, theChart: str) -> dict:
 	newFile = newFile.replace("\"", "")
 	newFile = newFile.replace("?", "")
 	newFile = newFile.replace("*", "")
-	newFile = newFile.rstrip()
-	newFile = newFile[:os.pathconf('.', 'PC_NAME_MAX') - 4] #-4 for .sng
+	newFile = newFile.replace("|", "")
+	newFile = newFile.lstrip()
+	newFile = newFile.replace(u'\u200b', "")
+	newFile = newFile.replace(u'\u200c', "")
+	newFile = newFile.strip()
 
 	if platform.system() == 'Windows':
-		outputDir = f"{chartFolder}\\{newFile}"[:os.pathconf('.', 'PC_PATH_MAX') - len(newFile)]
+		newFile = newFile[:MAX_FILE_LEN]
+		newFile = newFile.rstrip()
+		outputDir = f"{chartFolder}\\{newFile}"
 	else:
-		outputDir = f'{chartFolder}/{newFile}'[:os.pathconf('.', 'PC_PATH_MAX' ) - len(newFile)]
+		newFile = newFile[:MAX_FILE_LEN - 4] #-4 for .sng
+		outputDir = f'{chartFolder}/{newFile}'
 
 	return { "dir" : outputDir, "file" : newFile }
 
@@ -98,12 +132,33 @@ async def doChartDownload(theChart, args, sema):
 			if args.stop_on_error:
 				print("Encountered error, and continue error not set, quitting.")
 				sys.exit(1)
+
+		if args.remove_playlist:
+			#Added OS detection for long path purposes
+			chartDir = outputChartDir(args.clone_hero_folder, theChart)['dir'] if platform.system() != 'Windows' else f"{u'\\\\?\\'}{outputChartDir(args.clone_hero_folder, theChart)['dir']}"
+			if os.path.isfile(os.path.join(chartDir, "song.ini")):
+				await removePlaylist(chartDir)
+
+async def removePlaylist(chartDir):
+	#os.path.join change here as well (to reduce platform.system() calls)
+	fileName = os.path.join(chartDir, "song.ini")
+	with open(fileName, encoding='utf-8', mode="r") as file:
+		lines = file.readlines()
+	with open(fileName, encoding='utf-8', mode='w') as file:
+		for line in lines:
+			lineTest = line.replace(" ","").strip("\n")
+			if "playlist_track=" not in lineTest and "playlist=" not in lineTest:
+				file.write(line)
+
 def main():
+	#I removed winlongpath argument (as well as the code blocks) as it is unnecessary now
 	argParser = argparse.ArgumentParser()
 	argParser.add_argument("-t", "--threads", help="Maximum number of threads to allow", default=4, type=int)
-	argParser.add_argument("-td", "--temp-directory", help="Temporary directory to use for chart downloads before conversion", default="scratch")
+	argParser.add_argument("-p", "--page", help="Encore download page to start on", default=1, type=int)
+	argParser.add_argument("-td", "--temp-directory", help="Temporary directory to use for chart downloads before conversion", default=f"{os.getcwd()}\\scratch" if platform.system() == 'Windows' else "scratch")
 	argParser.add_argument("-soe", "--stop-on-error", help="Continue on error during conversion or download", action="store_true")
 	argParser.add_argument("-chf", "--clone-hero-folder", help="Clone Hero songs folder to output charts to", required=True)
+	argParser.add_argument("-rp", "--remove-playlist", help="Remove playlist data for downloaded charts", action="store_true")
 	args = argParser.parse_args()
 
 	print(f"Outputting charts to folder {args.clone_hero_folder}")
@@ -111,9 +166,14 @@ def main():
 	print(f"Using {args.threads} threads")
 	if args.stop_on_error:
 		print("Will stop download/convert of charts on error")
+	if args.remove_playlist:
+		print("Removing playlist data for charts (downloaded+to-download)")
+	if not args.page > 0:
+		print("Page argument must be >0!")
+		sys.exit(1)
 
 	sema = asyncio.Semaphore(int(args.threads))
-	page = 1
+	page = args.page
 	pageData = getEncorePage(page)
 	numCharts = pageData['found']
 	pageData = trimPageDuplicates(pageData['data'])
@@ -122,7 +182,11 @@ def main():
 			chartNum = ((page - 1) * 250) + (i + 1)
 			if chartNum % 500 == 0:
 				print(f"Progress {chartNum} of {numCharts}")
-			if os.path.isdir(outputChartDir(args.clone_hero_folder, chart)['dir']):
+			#Added OS detection for long path purposes
+			chartDir = outputChartDir(args.clone_hero_folder, chart)['dir'] if platform.system() != 'Windows' else f"{u'\\\\?\\'}{outputChartDir(args.clone_hero_folder, chart)['dir']}"
+			if os.path.isdir(chartDir):
+				if args.remove_playlist and os.path.isfile(os.path.join(chartDir, "song.ini")):
+					asyncio.run(removePlaylist(chartDir))
 				continue
 
 			print(f"Spawning thread for chart download chart {chartNum} out of {numCharts}")
