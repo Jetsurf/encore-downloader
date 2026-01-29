@@ -57,8 +57,11 @@ async def convertChart(tempFolder, chartFolder, theChart, rzflag) -> bool:
 	
 	return True
 
-def getEncorePage(page: int) -> dict:
-	d = { "search" : "", 'per_page' : 250, 'page' : page }
+def getEncorePage(page: int, search: str, dflag: bool) -> dict:
+	if dflag:
+		d = { "search" : search, 'per_page' : 250, 'page' : page, 'instrument':'drums', 'drumsReviewed':False }
+	else:
+		d = { "search" : search, 'per_page' : 250, 'page' : page }
 
 	resp = requests.post("https://api.enchor.us/search/", data = json.dumps(d), headers = {"Content-Type":"application/json"})
 	retJson = resp.json()
@@ -199,12 +202,14 @@ def schemaRename(chFolder, theChart):
 def main():
 	argParser = argparse.ArgumentParser()
 	argParser.add_argument("-t", "--threads", help="Maximum number of threads to allow", default=4, type=int)
+	argParser.add_argument("-s", "--search", help="Search to filter Encore results", default="", type=str)
 	argParser.add_argument("-p", "--page", help="Encore download page to start on", default=1, type=int)
 	argParser.add_argument("-td", "--temp-directory", help="Temporary directory to use for chart downloads before conversion", default=f"{os.getcwd()}\\scratch" if platform.system() == 'Windows' else "scratch")
 	argParser.add_argument("-soe", "--stop-on-error", help="Continue on error during conversion or download", action="store_true")
 	argParser.add_argument("-chf", "--clone-hero-folder", help="Clone Hero songs folder to output charts to", required=True)
 	argParser.add_argument("-rp", "--remove-playlist", help="Remove playlist data for downloaded charts", action="store_true")
 	argParser.add_argument("-rz", "--remove-zerowidth", help="BREAKS BRIDGE COMPATIBILITY! Removes zero-width characters from chart names. Retroactively renames any chart folders that contain zero-width characters.", action="store_true")
+	argParser.add_argument("-d", "--charts-with-drums", help="Only downloads charts containing drum", action="store_true")
 	argParser.add_argument("-sc", "--schema-cleanup", help="Renames folders that do not match Bridge's naming schema", action="store_true")
 	args = argParser.parse_args()
 
@@ -226,8 +231,9 @@ def main():
 
 	sema = asyncio.Semaphore(int(args.threads))
 	page = args.page
-	pageData = getEncorePage(page)
+	pageData = getEncorePage(page, args.search, args.charts_with_drums)
 	numCharts = pageData['found']
+	print(f'Found {numCharts} charts')
 	pageData = trimPageDuplicates(pageData['data'])
 	while(len(pageData) > 0):
 		for i, chart in enumerate(pageData):
@@ -249,7 +255,7 @@ def main():
 			asyncio.run(doChartDownload(chart, args, sema))
 
 		page += 1
-		pageData = trimPageDuplicates(getEncorePage(page)['data'])
+		pageData = trimPageDuplicates(getEncorePage(page, args.search, args.charts_with_drums)['data'])
 
 if __name__ == '__main__':
 	main()
