@@ -223,7 +223,7 @@ def main():
 	argParser.add_argument("-chf", "--clone-hero-folder", help="Clone Hero songs folder to output charts to", required=True)
 	argParser.add_argument("-rp", "--remove-playlist", help="Remove playlist data for downloaded charts", action="store_true")
 	argParser.add_argument("-rz", "--remove-zerowidth", help="BREAKS BRIDGE COMPATIBILITY! Removes zero-width characters from chart names. Retroactively renames any chart folders that contain zero-width characters.", action="store_true")
-	argParser.add_argument("-sc", "--schema-cleanup", help="Deletes folders that do not match Bridge's naming schema", action="store_true")
+	argParser.add_argument("-sc", "--schema-cleanup", help="Renames folders that do not match Bridge's naming schema", action="store_true")
 	args = argParser.parse_args()
 
 	print(f"Outputting charts to folder {args.clone_hero_folder}")
