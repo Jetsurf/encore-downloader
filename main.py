@@ -236,10 +236,12 @@ def main():
 			#Added OS detection for long path purposes
 			if args.schema_cleanup:
 				oldDir = oldOutputChartDir(args.clone_hero_folder, chart, True)['dir'] if platform.system() != 'Windows' else f"{u'\\\\?\\'}{oldOutputChartDir(args.clone_hero_folder, chart, True)['dir']}"
+				newDir = outputChartDir(args.clone_hero_folder, chart, True)['dir'] if platform.system() != 'Windows' else f"{u'\\\\?\\'}{outputChartDir(args.clone_hero_folder, chart, True)['dir']}"
 				oldDir2 = oldOutputChartDir(args.clone_hero_folder, chart, False)['dir'] if platform.system() != 'Windows' else f"{u'\\\\?\\'}{oldOutputChartDir(args.clone_hero_folder, chart, False)['dir']}"
-				if os.path.isdir(oldDir):
+				newDir2 = outputChartDir(args.clone_hero_folder, chart, False)['dir'] if platform.system() != 'Windows' else f"{u'\\\\?\\'}{outputChartDir(args.clone_hero_folder, chart, False)['dir']}"
+				if os.path.isdir(oldDir) and oldDir != newDir:
 					shutil.rmtree(oldDir)
-				if os.path.isdir(oldDir2):
+				if os.path.isdir(oldDir2) and oldDir2 != newDir2:
 					shutil.rmtree(oldDir2)
 			chartDir = outputChartDir(args.clone_hero_folder, chart, args.remove_zerowidth)['dir'] if platform.system() != 'Windows' else f"{u'\\\\?\\'}{outputChartDir(args.clone_hero_folder, chart, args.remove_zerowidth)['dir']}"
 			if os.path.isdir(chartDir):
