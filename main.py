@@ -3,7 +3,6 @@ import requests, json, asyncio, uuid, aiohttp, sys, argparse, os, platform, subp
 async def downloadChart(tempFolder, chartFolder, theChart: dict, rzflag) -> str:
 	url = f"https://files.enchor.us/{theChart['md5']}{('_novideo','')[not theChart['hasVideoBackground']]}.sng"
 	async with aiohttp.ClientSession() as session:
-		#changed timeout to include sock_connect and a longer total timeout
 		custom_timeout = aiohttp.ClientTimeout(sock_connect=10, total=300)
 		try:
 			resp = await session.get(url, timeout = custom_timeout)
@@ -19,21 +18,15 @@ async def downloadChart(tempFolder, chartFolder, theChart: dict, rzflag) -> str:
 			return None
 
 	sngUuid = str(uuid.uuid4())
-	#os.path.join() to reduce the number of platform.system() calls, no idea if this is "better", but looks nicer.
 	sngScratchDir = os.path.join(tempFolder, sngUuid)
 	output = outputChartDir(chartFolder, theChart, rzflag)
 
 	try:
 		os.makedirs(sngScratchDir)
-		if platform.system() == 'Windows':
-			#Make a new directory inside scratch for SngCli.exe to output to
-			os.makedirs(f"{sngScratchDir}\\1")
-			#change .sng save to just be "chart". This could be named anything, but chart seemed appropriate.
-			with open(f"{sngScratchDir}\\chart.sng",'wb') as file:
-				file.write(theSng)
-		else:
-			with open(f"{sngScratchDir}/{output['file']}.sng",'wb') as file:
-				file.write(theSng)
+		os.makedirs(f"{sngScratchDir}\\1")
+		with open(f"{sngScratchDir}\\chart.sng",'wb') as file:
+			file.write(theSng)
+		
 	except Exception as e:
 		print(f"Error encountered saving download - exception {e}")
 		return None
@@ -43,33 +36,24 @@ async def downloadChart(tempFolder, chartFolder, theChart: dict, rzflag) -> str:
 async def convertChart(tempFolder, chartFolder, theChart, rzflag) -> bool:
 	sngCliPath = f".\\SngCli\\SngCli.exe" if platform.system() == 'Windows' else f"SngCli/SngCli"
 	try:
-		#added variable to change destination of SngCli.exe output on Windows
-		if platform.system() == "Windows":
-			outputDir = f"{tempFolder}\\1" 
-		else:
-			outputDir = chartFolder
+		outputDir = os.path.join(tempFolder,"1")
 		proc = subprocess.run(f'{sngCliPath} decode -in "{tempFolder}" -out "{outputDir}" --noStatusBar', check=True, shell=True, stdout=subprocess.DEVNULL)
 	except Exception as e:
 		print(f"SngCli Decode Failed: {e}")
 		return False
 	
-	#This block performs the making of the final directory moves the decoded charts from the scratch folder (on Windows)
+	outputFolder = outputChartDir(chartFolder, theChart, rzflag)
 	if platform.system() == "Windows":
-		outputFolder = outputChartDir(chartFolder, theChart, rzflag)
-		#Making final directory path
 		finalChartPath = f"{u'\\\\?\\'}{outputFolder['dir']}"
-		os.makedirs(finalChartPath)
-		#path of decoded chart in scratch
-		fullChartTempPath = f"{tempFolder}\\1\\chart"
-		#Moving all items inside scratch to final
-		for item in os.listdir(fullChartTempPath):
-			source_item = os.path.join(fullChartTempPath, item)
-			target_item = os.path.join(finalChartPath, item)
-			shutil.move(source_item, target_item)
-		#cleanup scratch
-		shutil.rmtree(f'{tempFolder}')
 	else:
-		shutil.rmtree(f'{tempFolder}')
+		finalChartPath = outputFolder["dir"]
+	os.makedirs(finalChartPath)
+	fullChartTempPath = os.path.join(tempFolder,"1","chart")
+	for item in os.listdir(fullChartTempPath):
+		source_item = os.path.join(fullChartTempPath, item)
+		target_item = os.path.join(finalChartPath, item)
+		shutil.move(source_item, target_item)
+	shutil.rmtree(f'{tempFolder}')
 	
 	return True
 
@@ -108,7 +92,7 @@ def outputChartDir(chartFolder, theChart: str, rzflag) -> dict:
 
 	encoding = 'utf-8'
 	bytes_data = newFile.encode(encoding)
-	sliced_bytes = bytes_data[:255]
+	sliced_bytes = bytes_data[:MAX_FILE_LEN]
 	newFile = sliced_bytes.decode(encoding, errors='ignore')
 	newFile = newFile.rstrip()
 	outputDir = f"{chartFolder}\\{newFile}"
@@ -162,13 +146,11 @@ async def doChartDownload(theChart, args, sema):
 				sys.exit(1)
 
 		if args.remove_playlist:
-			#Added OS detection for long path purposes
 			chartDir = outputChartDir(args.clone_hero_folder, theChart, args.remove_zerowidth)['dir'] if platform.system() != 'Windows' else f"{u'\\\\?\\'}{outputChartDir(args.clone_hero_folder, theChart, args.remove_zerowidth)['dir']}"
 			if os.path.isfile(os.path.join(chartDir, "song.ini")):
 				await removePlaylist(chartDir)
 
 async def removePlaylist(chartDir):
-	#os.path.join change here as well (to reduce platform.system() calls)
 	fileName = os.path.join(chartDir, "song.ini")
 	with open(fileName, encoding='utf-8', mode="r") as file:
 		lines = file.readlines()
@@ -179,7 +161,6 @@ async def removePlaylist(chartDir):
 				file.write(line)
 
 def renameZeroWidthFolders(chFolder):
-	#check to cleanup folders containing zero-width spaces
 	folders = [f for f in os.listdir(chFolder) if os.path.isdir(os.path.join(chFolder, f))]
 	filtered_list = [item for item in folders if u'\u200b' in item or u'\u200c' in item]
 	for folder in filtered_list:
@@ -192,27 +173,28 @@ def renameZeroWidthFolders(chFolder):
 			oldFolder = f'{u'\\\\?\\'}{oldFolder}'
 			newFolder = f'{u'\\\\?\\'}{newFolder}'
 		if os.path.isdir(newFolder):
-			shutil.rmtree(f'{oldFolder}')
+			shutil.rmtree(oldFolder)
 		else:
-			os.rename(oldFolder, newFolder)
+			shutil.move(oldFolder, newFolder)
+			shutil.rmtree(oldFolder)
 
 def schemaRename(chFolder, theChart):
 	if platform.system != "Windows":
-		oldDir = oldOutputChartDir(chFolder, theChart, True)['dir']
-		newDir = outputChartDir(chFolder, theChart, True)['dir']
-		oldDir2 = oldOutputChartDir(chFolder, theChart, False)['dir']
-		newDir2 = outputChartDir(chFolder, theChart, False)['dir']
+		oldDir = oldOutputChartDir(chFolder, theChart, False)['dir']
+		newDir = outputChartDir(chFolder, theChart, False)['dir']
+		oldDirRZ = oldOutputChartDir(chFolder, theChart, True)['dir']
+		newDirRZ = outputChartDir(chFolder, theChart, True)['dir']
 	else:
-		oldDir = f"{u'\\\\?\\'}{oldOutputChartDir(chFolder, theChart, True)['dir']}"
-		newDir = f"{u'\\\\?\\'}{outputChartDir(chFolder, theChart, True)['dir']}"
-		oldDir2 = f"{u'\\\\?\\'}{oldOutputChartDir(chFolder, theChart, False)['dir']}"
-		newDir2 = f"{u'\\\\?\\'}{outputChartDir(chFolder, theChart, False)['dir']}"
+		oldDir = f"{u'\\\\?\\'}{oldOutputChartDir(chFolder, theChart, False)['dir']}"
+		newDir = f"{u'\\\\?\\'}{outputChartDir(chFolder, theChart, False)['dir']}"
+		oldDirRZ = f"{u'\\\\?\\'}{oldOutputChartDir(chFolder, theChart, True)['dir']}"
+		newDirRZ = f"{u'\\\\?\\'}{outputChartDir(chFolder, theChart, True)['dir']}"
 	if os.path.isdir(oldDir) and oldDir != newDir:
 		print(f'Renaming improperly named chart folder: {oldDir}')
-		os.rename(oldDir,newDir)
-	if os.path.isdir(oldDir2) and oldDir2 != newDir2:
-		print(f'Renaming improperly named chart folder: {oldDir2}')
-		os.rename(oldDir2,newDir2)
+		shutil.move(oldDir,newDir)
+	if os.path.isdir(oldDirRZ) and oldDirRZ != newDirRZ:
+		print(f'Renaming improperly named chart folder: {oldDirRZ}')
+		shutil.move(oldDirRZ,newDirRZ)
 
 def main():
 	argParser = argparse.ArgumentParser()
@@ -237,10 +219,10 @@ def main():
 	if args.remove_playlist:
 		print("Removing playlist data for charts (downloaded+to-download)")
 	if args.remove_zerowidth:
-		print("Renaming zero-width folders")
+		print("Removing zero-width characters from chart folder names (downloaded+to-download)")
 		renameZeroWidthFolders(args.clone_hero_folder)
 	if args.schema_cleanup:
-		print("Renaming old folders to new naming schema")
+		print("Renaming old chart folders to new naming schema")
 
 	sema = asyncio.Semaphore(int(args.threads))
 	page = args.page
