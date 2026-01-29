@@ -106,14 +106,13 @@ def outputChartDir(chartFolder, theChart: str, rzflag) -> dict:
 		newFile = newFile.replace(u'\u200c', "")
 	newFile = newFile.strip()
 
-	if platform.system() == 'Windows':
-		newFile = newFile[:MAX_FILE_LEN]
-		newFile = newFile.rstrip()
-		outputDir = f"{chartFolder}\\{newFile}"
-	else:
-		newFile = newFile[:MAX_FILE_LEN - 4] #-4 for .sng
-		outputDir = f'{chartFolder}/{newFile}'
-
+	encoding = 'utf-8'
+	bytes_data = newFile.encode(encoding)
+	sliced_bytes = bytes_data[:MAX_FILE_LEN]
+	newFile = sliced_bytes.decode(encoding, errors='ignore')
+	newFile = newFile.rstrip()
+	outputDir = f"{chartFolder}\\{newFile}"
+    
 	return { "dir" : outputDir, "file" : newFile }
 
 def oldOutputChartDir(chartFolder, theChart: str, rzflag) -> dict:
@@ -141,7 +140,7 @@ def oldOutputChartDir(chartFolder, theChart: str, rzflag) -> dict:
 	else:
 		newFile = newFile[:MAX_FILE_LEN - 4] #-4 for .sng
 		outputDir = f'{chartFolder}/{newFile}'
-
+	
 	return { "dir" : outputDir, "file" : newFile }
 
 async def doChartDownload(theChart, args, sema):
@@ -223,7 +222,7 @@ def main():
 	argParser.add_argument("-soe", "--stop-on-error", help="Continue on error during conversion or download", action="store_true")
 	argParser.add_argument("-chf", "--clone-hero-folder", help="Clone Hero songs folder to output charts to", required=True)
 	argParser.add_argument("-rp", "--remove-playlist", help="Remove playlist data for downloaded charts", action="store_true")
-	argParser.add_argument("-rz", "--remove-zerowidth", help="Remove zero-width characters from chart names. Retroactively renames any chart folders that contain zero-width characters.", action="store_true")
+	argParser.add_argument("-rz", "--remove-zerowidth", help="BREAKS BRIDGE COMPATIBILITY! Removes zero-width characters from chart names. Retroactively renames any chart folders that contain zero-width characters.", action="store_true")
 	argParser.add_argument("-sc", "--schema-cleanup", help="Deletes folders that do not match Bridge's naming schema", action="store_true")
 	args = argParser.parse_args()
 
