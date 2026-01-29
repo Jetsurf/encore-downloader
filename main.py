@@ -91,43 +91,15 @@ def trimPageDuplicates(thePage) -> dict:
 def outputChartDir(chartFolder, theChart: str, rzflag) -> dict:
 	MAX_FILE_LEN = os.pathconf('.', 'PC_NAME_MAX') if platform.system() != "Windows" else 255
 	newFile = f"{theChart['artist']} - {theChart['name']} ({theChart['charter']})"
-	newFile = newFile.replace("/",  u'\uFF0F') #／
-	newFile = newFile.replace("\\", u'\u29F5') #⧵
-	newFile = newFile.replace(":",  u'\uA789') #꞉
-	newFile = newFile.replace("<",  u'\u276E') #❮
-	newFile = newFile.replace(">",  u'\u276F') #❯
-	newFile = newFile.replace("\"", u'\u0027') #'
-	newFile = newFile.replace("?",  u'\uFF1F') #？
-	newFile = newFile.replace("*",  u'\u204E') #⁎
-	newFile = newFile.replace("|",  u'\u23D0') #⏐
-	newFile = newFile.lstrip()
-	if rzflag:
-		newFile = newFile.replace(u'\u200b', "")
-		newFile = newFile.replace(u'\u200c', "")
-	newFile = newFile.strip()
-
-	if platform.system() == 'Windows':
-		newFile = newFile[:MAX_FILE_LEN]
-		newFile = newFile.rstrip()
-		outputDir = f"{chartFolder}\\{newFile}"
-	else:
-		newFile = newFile[:MAX_FILE_LEN - 4] #-4 for .sng
-		outputDir = f'{chartFolder}/{newFile}'
-
-	return { "dir" : outputDir, "file" : newFile }
-
-def oldOutputChartDir(chartFolder, theChart: str, rzflag) -> dict:
-	MAX_FILE_LEN = os.pathconf('.', 'PC_NAME_MAX') if platform.system() != "Windows" else 255
-	newFile = f"{theChart['artist']} - {theChart['name']} ({theChart['charter']})"
-	newFile = newFile.replace("/",  "")
+	newFile = newFile.replace("/", "")
 	newFile = newFile.replace("\\", "")
-	newFile = newFile.replace(":",  "")
-	newFile = newFile.replace("<",  "")
-	newFile = newFile.replace(">",  "")
+	newFile = newFile.replace(":", "")
+	newFile = newFile.replace("<", "")
+	newFile = newFile.replace(">", "")
 	newFile = newFile.replace("\"", "")
-	newFile = newFile.replace("?",  "")
-	newFile = newFile.replace("*",  "")
-	newFile = newFile.replace("|",  "")
+	newFile = newFile.replace("?", "")
+	newFile = newFile.replace("*", "")
+	newFile = newFile.replace("|", "")
 	newFile = newFile.lstrip()
 	if rzflag:
 		newFile = newFile.replace(u'\u200b', "")
@@ -207,7 +179,6 @@ def main():
 	argParser.add_argument("-chf", "--clone-hero-folder", help="Clone Hero songs folder to output charts to", required=True)
 	argParser.add_argument("-rp", "--remove-playlist", help="Remove playlist data for downloaded charts", action="store_true")
 	argParser.add_argument("-rz", "--remove-zerowidth", help="Remove zero-width characters from chart names. Retroactively renames any chart folders that contain zero-width characters.", action="store_true")
-	argParser.add_argument("-sc", "--schema-cleanup", help="Deletes folders that do not match Bridge's naming schema", action="store_true")
 	args = argParser.parse_args()
 
 	print(f"Outputting charts to folder {args.clone_hero_folder}")
@@ -234,15 +205,6 @@ def main():
 			if chartNum % 500 == 0:
 				print(f"Progress {chartNum} of {numCharts}")
 			#Added OS detection for long path purposes
-			if args.schema_cleanup:
-				oldDir = oldOutputChartDir(args.clone_hero_folder, chart, True)['dir'] if platform.system() != 'Windows' else f"{u'\\\\?\\'}{oldOutputChartDir(args.clone_hero_folder, chart, True)['dir']}"
-				newDir = outputChartDir(args.clone_hero_folder, chart, True)['dir'] if platform.system() != 'Windows' else f"{u'\\\\?\\'}{outputChartDir(args.clone_hero_folder, chart, True)['dir']}"
-				oldDir2 = oldOutputChartDir(args.clone_hero_folder, chart, False)['dir'] if platform.system() != 'Windows' else f"{u'\\\\?\\'}{oldOutputChartDir(args.clone_hero_folder, chart, False)['dir']}"
-				newDir2 = outputChartDir(args.clone_hero_folder, chart, False)['dir'] if platform.system() != 'Windows' else f"{u'\\\\?\\'}{outputChartDir(args.clone_hero_folder, chart, False)['dir']}"
-				if os.path.isdir(oldDir) and oldDir != newDir:
-					shutil.rmtree(oldDir)
-				if os.path.isdir(oldDir2) and oldDir2 != newDir2:
-					shutil.rmtree(oldDir2)
 			chartDir = outputChartDir(args.clone_hero_folder, chart, args.remove_zerowidth)['dir'] if platform.system() != 'Windows' else f"{u'\\\\?\\'}{outputChartDir(args.clone_hero_folder, chart, args.remove_zerowidth)['dir']}"
 			if os.path.isdir(chartDir):
 				if args.remove_playlist and os.path.isfile(os.path.join(chartDir, "song.ini")):
