@@ -155,11 +155,11 @@ async def removePlaylist(chartDir):
 
 def schemaRename(chFolder, theChart):
 	if platform.system != "Windows":
-		oldDir = oldOutputChartDir(chFolder, theChart, False)['dir']
-		newDir = outputChartDir(chFolder, theChart, False)['dir']
+		oldDir = oldOutputChartDir(chFolder, theChart)['dir']
+		newDir = outputChartDir(chFolder, theChart)['dir']
 	else:
-		oldDir = f"{u'\\\\?\\'}{oldOutputChartDir(chFolder, theChart, False)['dir']}"
-		newDir = f"{u'\\\\?\\'}{outputChartDir(chFolder, theChart, False)['dir']}"
+		oldDir = f"{u'\\\\?\\'}{oldOutputChartDir(chFolder, theChart)['dir']}"
+		newDir = f"{u'\\\\?\\'}{outputChartDir(chFolder, theChart)['dir']}"
 	if os.path.isdir(oldDir) and oldDir != newDir:
 		print(f'Renaming improperly named chart folder: {oldDir}')
 		shutil.move(oldDir,newDir)
