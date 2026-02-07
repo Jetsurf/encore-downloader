@@ -31,9 +31,10 @@ To download, hit "Code" at the top right, then download as a zip and extract it.
   -soe, --stop-on-error
                         Continue on error during conversion or download. Only used for debugging
   -p PAGE, --page PAGE
-                        Starting page for Encore downloads - defaults to 1
+                        Starting page for Encore downloads - defaults to 1. Only used for debugging
   -s SEARCH, --search SEARCH
                         String entry to search on Encore - defaults to blank string (empty search/all results)
+                        Only used for debugging
   -d, --drums
                         Only downloads charts containing drum parts
   -sc, --schema-cleanup
