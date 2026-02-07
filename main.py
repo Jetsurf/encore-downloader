@@ -92,7 +92,7 @@ def outputChartDir(chartFolder, theChart: str) -> dict:
 	sliced_bytes = bytes_data[:255]
 	newFile = sliced_bytes.decode(encoding, errors='ignore')
 	newFile = newFile.rstrip()
-	outputDir = f"{chartFolder}\\{newFile}"
+	outputDir = os.path.join(chartFolder, newFile)
     
 	return { "dir" : outputDir, "file" : newFile }
 
