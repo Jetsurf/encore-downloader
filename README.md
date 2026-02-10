@@ -30,6 +30,20 @@ To download, hit "Code" at the top right, then download as a zip and extract it.
                         conversion. Defaults to the 'scratch' folder included in the zip.
   -soe, --stop-on-error
                         Continue on error during conversion or download. Only used for debugging
+  -p PAGE, --page PAGE
+                        Starting page for Encore downloads - defaults to 1. Only used for debugging
+  -s SEARCH, --search SEARCH
+                        String entry to search on Encore - defaults to blank string (empty search/all results)
+                        Only used for debugging
+  -d, --drums
+                        Only downloads charts containing drum parts
+  -sc, --schema-cleanup
+                        Renames downloaded charts to match the naming schema that Bridge uses.
+                        Run the script with this flag if you have previously downloaded charts with this
+                        script and want to have compatibility with Bridge
+  -rp, --remove-playlist
+                        Removes "playlist=" and "playlist_track=" lines from the song.ini of every chart.
+                        This includes both new downloads, and previously downloaded charts in your directory.
 ```
 
 ### Windows
