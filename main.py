@@ -1,4 +1,4 @@
-import requests, json, asyncio, uuid, aiohttp, sys, argparse, os, platform, subprocess, shutil, unicodedata, re
+import requests, json, asyncio, uuid, aiohttp, sys, argparse, os, platform, subprocess, shutil, unicodedata, re, pathlib
 
 async def downloadChart(tempFolder, theChart: dict) -> str:
 	url = f"https://files.enchor.us/{theChart['md5']}{('_novideo','')[not theChart['hasVideoBackground']]}.sng"
@@ -165,6 +165,8 @@ def schemaRename(chFolder, theChart):
 		shutil.move(oldDir,newDir)
 
 def main():
+	script_dir = pathlib.Path(__file__).resolve().parent
+	os.chdir(script_dir)
 	argParser = argparse.ArgumentParser()
 	argParser.add_argument("-t", "--threads", help="Maximum number of threads to allow", default=4, type=int)
 	argParser.add_argument("-s", "--search", help="Search to filter Encore results", default="", type=str)
@@ -174,8 +176,12 @@ def main():
 	argParser.add_argument("-chf", "--clone-hero-folder", help="Clone Hero songs folder to output charts to", required=True)
 	argParser.add_argument("-rp", "--remove-playlist", help="Remove playlist data for downloaded charts", action="store_true")
 	argParser.add_argument("-d", "--charts-with-drums", help="Only downloads charts containing drum", action="store_true")
-	argParser.add_argument("-sc", "--schema-cleanup", help="Renames folders that do not match Bridge's naming schema", action="store_true")
+	argParser.add_argument("-sc", "--schema-cleanup", help="Not needed unless you have ran an old version of this script. Renames old folders that do not match Bridge's naming schema", action="store_true")
 	args = argParser.parse_args()
+
+	if not os.path.isdir(args.clone_hero_folder):
+		print("Clone Hero folder does not exist! Please provide a valid, existing path with -chf (--clone-hero-folder)")
+		sys.exit(1)
 
 	print(f"Outputting charts to folder {args.clone_hero_folder}")
 	print(f"Using temp folder {args.temp_directory} for chart downloads")
