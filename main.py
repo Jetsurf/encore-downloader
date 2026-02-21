@@ -33,7 +33,8 @@ async def downloadChart(tempFolder, theChart: dict) -> str:
 	return sngScratchDir
 
 async def convertChart(tempFolder, chartFolder, theChart) -> bool:
-	sngCliPath = f".\\SngCli\\SngCli.exe" if platform.system() == 'Windows' else f"SngCli/SngCli"
+	sngCliRelPath = os.path.join("SngCli", "SngCli.exe" if platform.system() == 'Windows' else "SngCli")
+	sngCliPath = script_path(sngCliRelPath)
 	try:
 		outputDir = os.path.join(tempFolder,"1")
 		proc = subprocess.run(f'{sngCliPath} decode -in "{tempFolder}" -out "{outputDir}" --noStatusBar', check=True, shell=True, stdout=subprocess.DEVNULL)
@@ -164,14 +165,20 @@ def schemaRename(chFolder, theChart):
 		print(f'Renaming improperly named chart folder: {oldDir}')
 		shutil.move(oldDir,newDir)
 
+def script_path(relative_path):
+    if getattr(sys, 'frozen', False):
+        base_path = os.path.dirname(sys.executable)
+    else:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        
+    return os.path.join(base_path, relative_path)
+
 def main():
-	script_dir = pathlib.Path(__file__).resolve().parent
-	os.chdir(script_dir)
 	argParser = argparse.ArgumentParser()
 	argParser.add_argument("-t", "--threads", help="Maximum number of threads to allow", default=4, type=int)
 	argParser.add_argument("-s", "--search", help="Search to filter Encore results", default="", type=str)
 	argParser.add_argument("-p", "--page", help="Encore download page to start on", default=1, type=int)
-	argParser.add_argument("-td", "--temp-directory", help="Temporary directory to use for chart downloads before conversion", default=f"{os.getcwd()}\\scratch" if platform.system() == 'Windows' else "scratch")
+	argParser.add_argument("-td", "--temp-directory", help="Temporary directory to use for chart downloads before conversion", default=f"{script_path('scratch')}", type=str)
 	argParser.add_argument("-soe", "--stop-on-error", help="Continue on error during conversion or download", action="store_true")
 	argParser.add_argument("-chf", "--clone-hero-folder", help="Clone Hero songs folder to output charts to", required=True)
 	argParser.add_argument("-rp", "--remove-playlist", help="Remove playlist data for downloaded charts", action="store_true")
